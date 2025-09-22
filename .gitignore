@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environments
+venv/
+*.venv
+env/
+.env
+
+# IDE Folders
+.idea/
+.vscode/
+
+# Database 
+chroma_db/
+*.db
+
+# Other
+.DS_Store
+legacy_versions/
