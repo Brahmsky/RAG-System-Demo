@@ -7,8 +7,11 @@ class Compressor:
     def compress(self, query, docs):
         context = "\n\n".join(docs)
         prompt = f"根据问题《{query}》，请从以下上下文中抽取最相关的句子，保持原句，不要改写：\n{context}, 每个文档之间的结果用空行分割"
-        response = self.client.models.generate_content(
+        response = self.client.chat.completions.create(
             model=self.model,
-            contents=prompt,
+            messages=[
+                {"role": "system", "content": "你是一个擅长文档信息处理的专家。"},
+                {"role": "user", "content": prompt}
+            ]
         )
-        return [s.strip() for s in response.text.split('\n') if s.strip()]
+        return [s.strip() for s in response.choices[0].message.content.split('\n') if s.strip()]

@@ -12,8 +12,14 @@ class MultiqueryGenerator(QueryExpander):
                   f"用空行分隔开每个查询，不要输出编号以及多余内容，严格遵循此格式。"
                   f"原始问题：{query}"
                   f"你的查询：")
-        resp = self.client.models.generate_content(model=self.model, contents=prompt)
-        queries = resp.text.split('\n\n')
+        resp = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": "你是一个擅长查询信息的专家。"},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        queries = resp.choices[0].message.content.split('\n\n')
         if self.verbose:
             print(f"扩展{num_queries}个查询")
             for i, query in enumerate(queries):

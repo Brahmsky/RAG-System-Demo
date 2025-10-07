@@ -7,7 +7,7 @@ python-docx~=1.2.0
 jieba>=0.42.1
 spacy
 google-genai
-
+openai
 # python -m spacy download en_core_web_sm
 # python -m spacy download zh_core_web_sm
 numpy~=1.26.4

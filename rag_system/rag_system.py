@@ -1,5 +1,8 @@
+import os
 from pathlib import Path
 from google import genai
+from openai import OpenAI
+from neo4j import GraphDatabase
 
 from .database import KnowledgeDatabase
 from .retriever import Retriever
@@ -10,13 +13,21 @@ from .text_utils import TextProcessor
 from .config import RAGConfig
 from .multiquery_generator import MultiqueryGenerator
 from .embedder import Embedder
+from .neo.Data2Neo4j import Data2Neo4j
 
 class RAGSystem:
     def __init__(self, config: RAGConfig):
         self.config = config
-        self.client = genai.Client(api_key=config.api_key)
+        ebd_client = genai.Client(api_key=config.gemini_api_key)
+        llm_client = OpenAI(api_key=os.environ.get("DEEPSEEK_API_KEY"),
+                                base_url='https://api.deepseek.com')
+        neo_driver = {'uri': config.neo4j_uri,'auth': config.neo4j_auth}
+        try:
+            self.neo = Data2Neo4j(llm_client, config.llm_model_name, neo_driver)
+        except Exception as e:
+            raise RuntimeError(f"Neo4j初始化出错：{str(e)}，请检查服务/配置！")
 
-        self.embedder = Embedder(self.client, config.embedding_model_name)
+        self.embedder = Embedder(ebd_client, config.embedding_model_name)
         # 初始化数据库
         self.db = KnowledgeDatabase(
             db_path=config.db_path,
@@ -25,7 +36,7 @@ class RAGSystem:
         )
         self.db.rebuild_bm25()
 
-        query_expander = MultiqueryGenerator(self.client, config.llm_model_name)
+        query_expander = MultiqueryGenerator(llm_client, config.llm_model_name)
 
         collection_name = RAGConfig.embedding_model_name.replace('/', '_')
         self.collection = self.db.chroma_client.get_or_create_collection(name=collection_name)
@@ -33,13 +44,13 @@ class RAGSystem:
         # 初始化模块
         self.retriever = Retriever(self.db, embedder=self.embedder, query_expander=query_expander, verbose=config.verbose)
         self.reranker = Reranker(config.reranker_model_name)
-        self.compressor = Compressor(self.client, config.llm_model_name, verbose=config.verbose)
-        self.generator = Generator(self.client, config.llm_model_name)
+        self.compressor = Compressor(llm_client, config.llm_model_name, verbose=config.verbose)
+        self.generator = Generator(llm_client, config.llm_model_name)
 
     # ================= 知识库管理 =================
 
     def add_corpus(self, filename: str, language="English"):
-        """添加新文档到知识库"""
+        """添加新文档到知识库 - 使用文档级实体识别优化图谱构建"""
         filepath = Path(self.config.knowledgebase_path) / filename
 
         print(f"开始处理知识库文件：{filepath}")
@@ -52,7 +63,7 @@ class RAGSystem:
 
         new_docs, new_ids = [], []
         for i, doc in enumerate(chunks):
-            if ids[i] not in existing_ids:  # 这里逻辑是，只有手动在后面添加的文本内容多到出现了新的块时，才会去建立新的索引，如果是小改的话就需要主函数中手动更新
+            if ids[i] not in existing_ids:
                 new_docs.append(doc)
                 new_ids.append(ids[i])
         if not new_docs:
@@ -60,21 +71,29 @@ class RAGSystem:
             return
 
         print(f"向数据库中添加{len(new_docs)}个新文本块……")
+        
+        # ========== 🔥 关键改进：使用文档级处理方法 ==========
+        # 使用新的process_document方法替代逐chunk调用process
+        self.neo.process_document(filename, text, new_docs)
+        
         # 批量生成 embedding
         batch_size = 100
         for i in range(0, len(new_docs), batch_size):
             batch = new_docs[i:i+batch_size]
 
             embeddings = self.embedder.embed(batch, task_type="RETRIEVAL_DOCUMENT")
-            ids = [f"{filename}_{i+j}" for j in range(len(batch))]
+            batch_ids = [f"{filename}_{i+j}" for j in range(len(batch))]
             metadatas = [{"source": filename} for _ in batch]
 
             self.db.collection.add(
-                ids=ids,
+                ids=batch_ids,
                 documents=batch,
                 embeddings=embeddings,
                 metadatas=metadatas,
             )
+
+        # 执行后处理合并
+        self.neo.after_processing()
 
         self.db.rebuild_bm25()
         print(f"文档 {filename} 添加完成 ✅")
@@ -88,6 +107,8 @@ class RAGSystem:
         ids = results["ids"]
         if ids:
             self.db.collection.delete(ids=ids)
+
+        self.neo.delete_graph_from_sources(filename)
 
         self.db.rebuild_bm25()
         if self.config.verbose:
@@ -106,22 +127,45 @@ class RAGSystem:
 
     # ================= 主查询接口 =================
 
-    def query(self, query: str, k=10, top_n=3, mode="hybrid", compress=False) -> str:
+    def query(self, query: str, k=10, top_n=4, mode="hybrid", compress=False, source_filter=None) -> str:
         """统一查询接口"""
-        if mode == "vector":
-            docs = self.retriever.vector_search(query, k)
-        elif mode == "keyword":
-            docs = self.retriever.keyword_search(query, k)
-        elif mode =='fusion':
-            docs = self.retriever.fusion_search(query, k)
-        else:  # 默认 hybrid
-            docs = self.retriever.hybrid_search(query, k)
+        text_docs = []
+        graph_context = ""
+        if mode in ["vector", "keyword", "expand", "text_hybrid"]:
+            if mode == "vector":
+                text_docs = self.retriever.vector_search(query, k, source_filter=source_filter)
+            elif mode == "keyword":
+                text_docs = self.retriever.keyword_search(query, k)
+            elif mode == "expand":
+                text_docs = self.retriever.expand_search(query, k, source_filter=source_filter)
+            elif mode == "text_hybrid":
+                text_docs = self.retriever.text_hybrid_search(query, k, source_filter=source_filter)
 
-        if not docs:
-            return "没有找到相关信息"
+            if text_docs:
+                text_docs = self.reranker.rerank(query, text_docs, top_n)
+                if compress:
+                    text_docs = self.compressor.compress(query, text_docs)
+            else:
+                return "文本中未找到相关信息"
 
-        docs = self.reranker.rerank(query, docs, top_n)
-        if compress:
-            docs = self.compressor.compress(query, docs)
+        elif mode == "graph":
+            graph_context = self.neo.query_graph_raw(query)
+            graph_context = graph_context if graph_context else "知识图谱中未找到相关信息"
 
-        return self.generator.generate(query, docs)
+        elif mode == "hybrid": # 默认模式
+            text_docs = self.retriever.text_hybrid_search(query, k, source_filter=source_filter)
+            if text_docs:
+                text_docs = self.reranker.rerank(query, text_docs, top_n)
+                if compress:
+                    text_docs = self.compressor.compress(query, text_docs)
+
+            graph_context = self.neo.query_graph_raw(query)
+            graph_context = graph_context if graph_context else "知识图谱中未找到相关信息"
+
+        else:
+            return "Unknown search mode!"
+
+        if not text_docs and (not graph_context or "未找到" in graph_context):
+            return "文本和知识图谱中均未找到相关信息"
+
+        return self.generator.generate(query, text_docs, graph_context)

@@ -1,23 +1,58 @@
-# Python
+# 数据库文件
+chroma_db/
+*.db
+*.sqlite
+
+# 缓存文件
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.Python
+*.so
+.pytest_cache/
+.coverage
 
-# Virtual Environments
-venv/
-*.venv
-env/
+# 环境变量文件
 .env
+.env.local
+.env.*.local
 
-# IDE Folders
-.idea/
+# IDE配置文件
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# Database 
-chroma_db/
-*.db
+# 日志文件
+*.log
+logs/
 
-# Other
+# 临时文件
+*.tmp
+*.temp
 .DS_Store
+Thumbs.db
+
+# 团队开发文档
+docs/team/
+team_docs/
+internal_docs/
+
+# Legacy版本
 legacy_versions/
+old_versions/
+backup/
+
+# Neo4j数据库目录（如果是本地安装）
+neo4j_data/
+neo4j_logs/
+
+# 个人配置文件
+config_personal.py
+personal_settings.json
+
+# 测试输出
+test_outputs/
+temp_test_files/

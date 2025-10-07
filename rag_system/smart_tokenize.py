@@ -1,5 +1,8 @@
 import re
-import jieba
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='jieba') # 2025.10.7
+
+import jieba  # 之后再导入 jieba
 
 def smart_tokenize(text, lang="auto"):
     has_chinese = bool(re.search(r'[\u4e00-\u9fa5]', text))
@@ -10,7 +13,3 @@ def smart_tokenize(text, lang="auto"):
     else:
         tokens = re.findall(r'[a-zA-Z0-9]+', text.lower())
     return tokens
-
-if __name__=='__main__':
-    tokens = smart_tokenize("你好，我是阿巴阿巴，abab")
-    print(tokens)

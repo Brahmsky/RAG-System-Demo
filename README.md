@@ -1,21 +1,30 @@
-# RAG_demo - 检索增强生成系统
+# RAG_demo - 双引擎智能问答系统
 
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![RAG](https://img.shields.io/badge/RAG-Retrieval%20Augmented%20Generation-orange.svg)](https://arxiv.org/abs/2005.11401)
+[![Knowledge Graph](https://img.shields.io/badge/Knowledge%20Graph-Neo4j-green.svg)](https://neo4j.com/)
 
-一个基于检索增强生成（RAG）技术的智能问答系统，支持多种文档格式、多种检索策略和多语言处理。
+一个基于检索增强生成（RAG）技术的双引擎智能问答系统，融合**文本检索**和**知识图谱**，支持多种文档格式、多种检索策略和多语言处理。
 
 ## 🌟 主要特性
 
-- **🔍 多种检索策略**: 向量检索 (HNSW)、关键词检索 (BM25)、混合检索 (RRF)、多查询融合
-- **📚 格式支持**: Markdown (.md)、Word文档 (.docx)、纯文本 (.txt)
-- **🌐 多语言支持**: 中文 (jieba分词)、英文智能分词和检索优化
+### 🔍 双引擎检索架构
+- **文本检索引擎**: 向量检索 (HNSW)、关键词检索 (BM25)、混合检索 (RRF)、多查询融合
+- **知识图谱引擎**: 基于Neo4j的实体关系图谱，支持复杂语义推理
+- **智能融合**: 自动选择最优检索策略，提供更精准的答案
+
+### 📚 格式与语言支持
+- **文档格式**: Markdown (.md)、Word文档 (.docx)、纯文本 (.txt)
+- **多语言支持**: 中文 (jieba分词)、英文智能分词和检索优化
+- **自动构图**: 从文档自动抽取实体关系，构建知识图谱
+
+### 🚀 高级功能
 - **🎯 智能重排序**: 基于 Cross-Encoder 的多语言结果重排序
 - **💡 上下文压缩**: 抽取式压缩，减少 token 消耗，提升生成质量
-- **🚀 查询扩展**: 基于 Gemini LLM 的多查询生成，提升召回率
-- **⚡ 持久化存储**: ChromaDB + 增量更新，避免重复处理
-- **🏗️ 模块化架构**: 依赖注入设计，易于扩展和测试
+- **🧠 实体消歧**: LLM驱动的实体识别与合并，保证图谱质量
+- **⚡ 持久化存储**: ChromaDB + Neo4j + 增量更新，避免重复处理
+- **🏗️ 模块化架构**: 遵循SOLID原则，依赖注入设计，易于扩展和测试
 
 ## 🏗️ 系统架构
 
@@ -131,8 +140,8 @@ rag.add_corpus("中文文档.docx", language="Chinese")
 
 # 4. 执行查询
 answer = rag.query(
-    query="光合作用的暗反应发生在什么地方？",
-    mode="fusion",      # 检索模式
+    query="图灵被定成什么罪了？",
+    mode="graph",       # 检索模式: text/graph/fusion
     compress=True       # 是否启用上下文压缩
 )
 print(answer)
@@ -199,6 +208,12 @@ answer = rag.query("深度学习的应用", mode="hybrid")
 
 # 多查询融合 - 最佳效果
 answer = rag.query("机器学习算法比较", mode="fusion")
+
+# 知识图谱检索 - 精确关系推理
+answer = rag.query("图灵都研究啥的？", mode="graph")
+
+# 双引擎融合 - 最全面覆盖
+answer = rag.query("人工智能的发展历史和未来趋势", mode="hybrid_graph")
 ```
 
 ### 高级功能
@@ -245,6 +260,15 @@ RAG_demo/
 │   ├── database.py            # 数据库管理
 │   ├── text_utils.py          # 文本处理工具
 │   ├── smart_tokenize.py      # 智能分词
+│   ├── neo/                   # 知识图谱模块
+│   │   ├── Data2Neo4j.py        # 向后兼容适配器
+│   │   ├── knowledge_graph_builder.py  # 主协调器
+│   │   ├── graph_database.py    # Neo4j数据库操作
+│   │   ├── entity_extractor.py  # 实体抽取器
+│   │   ├── graph_processor.py   # 图谱处理器
+│   │   ├── query_engine.py      # 图谱查询引擎
+│   │   ├── entity_merger.py     # 实体合并器
+│   │   └── data_structure.py    # 数据结构定义
 │   └── ...
 ├── main.py                     # 主程序入口
 ├── requirements.txt            # 依赖列表
@@ -394,4 +418,4 @@ python -m spacy download zh_core_web_sm
 **解决方案**: 
 - 系统已优化提示词，增加了格式约束
 - 使用 `split('\n\n')` 解析空行分隔的查询
-- 对于不符合格式的输出，系统会降级为混合检索s
+- 对于不符合格式的输出，系统会降级为混合检索

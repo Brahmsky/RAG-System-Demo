@@ -46,12 +46,12 @@ class Retriever:
         top_idx = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:k]
         return [self.db.bm25_corpus[i] for i in top_idx]
 
-    def hybrid_search(self, query, k=5, source_filter=None):
+    def text_hybrid_search(self, query, k=5, source_filter=None):
         v = self.vector_search(query, k, source_filter)
         bm = self.keyword_search(query, k)
         return self.reciprocal_rank_fusion([v, bm])  # RRF fusion
 
-    def fusion_search(self, query, k=5, num_queries=3, source_filter=None):
+    def expand_search(self, query, k=5, num_queries=3, source_filter=None):
         """
         :param query: 原始查询
         :param k: 控制单个搜索方案的返回结果数量
