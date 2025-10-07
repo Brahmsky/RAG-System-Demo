@@ -31,22 +31,30 @@
 ```mermaid
 graph TB
     A[用户查询] --> B[RAGSystem]
-    B --> C[Retriever 检索器]
-    C --> D[向量检索]
-    C --> E[关键词检索 BM25]
-    C --> F[多查询融合]
-    D --> G[Reranker 重排序]
-    E --> G
-    F --> G
-    G --> H[Compressor 压缩器]
-    H --> I[Generator 生成器]
-    I --> J[最终答案]
+    B --> C[文本检索路径]
+    B --> D[图谱检索路径]
     
-    K[知识库管理] --> L[ChromaDB]
-    K --> M[BM25索引]
-    N[Google Gemini] --> I
-    N --> F
-```
+    C --> E[Retriever]
+    E --> F[向量检索 Embedder]
+    E --> G[关键词检索 BM25]
+    E --> H[多查询扩展 MultiqueryGenerator]
+    
+    F --> I[Reranker重排序]
+    G --> I
+    H --> I
+    I --> J[Compressor压缩]
+    
+    D --> K[Neo4j图谱]
+    K --> L[Cypher查询生成]
+    
+    J --> M[Generator生成器]
+    L --> M
+    M --> N[最终答案]
+    
+    O[知识库文档] --> P[TextProcessor]
+    P --> Q[ChromaDB存储]
+    P --> R[Data2Neo4j图谱构建]
+    R --> K
 
 ### 设计模式亮点
 
@@ -77,23 +85,197 @@ self.retriever = Retriever(db, embedder, query_expander=query_expander)
 - **MultiqueryGenerator** 作为具体策略实现
 - 可轻易添加其他查询扩展策略（如基于规则的扩展、词汇扩展等）
 
-## 🚀 快速开始
+## 🚀 完整部署指南
 
-### 1. 环境准备
+> ⚠️ **重要提示**: 本系统依赖Neo4j数据库存储知识图谱，必须先安装和配置Neo4j
 
-**系统要求:**
-- Python 3.9+
-- 网络连接 (调用 Google Gemini API)
+### 步骤1: 系统要求检查
 
-### 2. 安装依赖
+- **Python 3.9+** (检查: `python --version`)
+- **内存**: 至少4GB RAM (推荐8GB+)
+- **硬盘空间**: 至尚2GB 可用空间
+- **网络**: 稳定的互联网连接 (调用 Gemini API)
+
+### 步骤2: Neo4j数据库安装 🔧
+
+#### 选项A: Neo4j Desktop (🔥 推荐新手)
+
+1. **下载安装**
+   ```bash
+   # 访问官网下载并安装
+   https://neo4j.com/download/
+   ```
+
+2. **创建数据库**
+   - 打开 Neo4j Desktop
+   - 点击 "**New**" -> "**Create Database**"
+   - 设置数据库名称: `rag-knowledge-graph`
+   - **设置密码**: `password123` (请记住这个密码！)
+   - 点击 "**Create**"
+
+3. **启动服务**
+   - 选中刚创建的数据库
+   - 点击 "**Start**" 按钮
+   - 等待状态变为 "**Running**" (通常陠30-60秒)
+
+4. **验证安装**
+   ```bash
+   # 访问 Web 界面
+   http://localhost:7474
+   
+   # 登录信息
+   URI: bolt://localhost:7687
+   Username: neo4j
+   Password: password123
+   ```
+
+#### 选项B: Docker部署 (🚀 推荐开发者)
 
 ```bash
-# 安装 Python 依赖
+# 1. 下载并运行Neo4j容器
+docker run \
+    --name rag-neo4j \
+    -p 7474:7474 -p 7687:7687 \
+    -d \
+    -v rag_neo4j_data:/data \
+    -v rag_neo4j_logs:/logs \
+    --env NEO4J_AUTH=neo4j/password123 \
+    --env NEO4J_PLUGINS='["apoc"]' \
+    neo4j:5.15
+
+# 2. 检查容器状态
+docker ps | grep rag-neo4j
+
+# 3. 查看日志 (确保正常启动)
+docker logs rag-neo4j | tail -20
+
+# 4. 验证访问
+echo "访问 http://localhost:7474 进行验证"
+```
+
+#### 选项C: Neo4j Aura Cloud (☁️ 推荐生产环境)
+
+1. **注册账户**
+   ```bash
+   # 访问官网注册免费账户
+   https://neo4j.com/cloud/aura/
+   ```
+
+2. **创建实例**
+   - 点击 "**Create Instance**"
+   - 选择 "**AuraDB Free**" (免费套餐)
+   - 选择区域: 亚太地区 (优化延迟)
+   - 记住生成的密码！
+
+3. **获取连接信息**
+   ```
+   URI: neo4j+s://xxxxxxxx.databases.neo4j.io
+   Username: neo4j  
+   Password: 系统生成的密码
+   ```
+
+### 步骤3: 项目环境配置
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/Brahmsky/RAG-System-Demo.git
+cd RAG-System-Demo
+
+# 2. 创建虚拟环境 (强烈推荐)
+python -m venv rag_env
+
+# Windows 激活
+rag_env\Scripts\activate
+
+# Linux/Mac 激活
+source rag_env/bin/activate
+
+# 3. 升级pip并安装依赖
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 
-# 下载 spaCy 语言模型
+# 4. 下载语言模型
 python -m spacy download en_core_web_sm
 python -m spacy download zh_core_web_sm
+```
+
+### 步骤4: 配置环境变量
+
+#### 必需: Google API Key
+
+**Windows (PowerShell):**
+```powershell
+# 设置环境变量
+$env:GOOGLE_API_KEY="your_google_api_key_here"
+
+# 验证设置
+echo $env:GOOGLE_API_KEY
+```
+
+**Linux/Mac:**
+```bash
+# 设置环境变量
+export GOOGLE_API_KEY="your_google_api_key_here"
+
+# 验证设置
+echo $GOOGLE_API_KEY
+
+# 永久保存 (可选)
+echo 'export GOOGLE_API_KEY="your_google_api_key_here"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+#### 可选: Neo4j 连接信息
+
+> 如果使用默认设置 (localhost:7687, neo4j/password123)，可跳过此步骤
+
+**Windows (PowerShell):**
+```powershell
+$env:NEO4J_URI="bolt://localhost:7687"
+$env:NEO4J_USER="neo4j"
+$env:NEO4J_PASSWORD="password123"
+```
+
+**Linux/Mac:**
+```bash
+export NEO4J_URI="bolt://localhost:7687"
+export NEO4J_USER="neo4j"
+export NEO4J_PASSWORD="password123"
+```
+
+### 步骤5: 运行系统
+
+```bash
+# 基础测试
+python main.py
+
+# 如果成功，您将看到类似输出:
+# [Neo4jDatabase] Driver initialized.
+# [Data2Neo4j] Compatibility adapter initialized.
+# 开始处理知识库文件...
+```
+
+### 步骤6: 验证功能
+
+```python
+# 打开Python命令行测试
+python
+
+# 在Python交互式环境中运行:
+from rag_system.config import RAGConfig
+from rag_system.rag_system import RAGSystem
+
+config = RAGConfig(embedding_model_name="gemini-embedding-001", verbose=True)
+rag = RAGSystem(config)
+
+# 测试文本检索
+result = rag.query("什么是人工智能？", mode="vector")
+print(result)
+
+# 测试知识图谱 (需要先添加数据)
+rag.add_corpus("test_build_graph.md")
+result = rag.query("图灵都研究啥的？", mode="graph")
+print(result)
 ```
 
 ### 3. 配置环境变量
@@ -110,10 +292,38 @@ Linux/Mac:
 export GOOGLE_API_KEY="your_google_api_key_here"
 ```
 
-### 4. 运行示例
+### 步骤7: 常见问题排查 🔧
 
+如果遇到问题，请按照以下步骤排查：
+
+#### Neo4j 连接问题
 ```bash
-python main.py
+# 1. 检查Neo4j服务状态
+# Neo4j Desktop: 确保显示"Running"
+# Docker: docker ps | grep neo4j
+
+# 2. 检查端口
+netstat -an | findstr 7687  # Windows
+netstat -an | grep 7687     # Linux/Mac
+
+# 3. 测试连接
+# 访问 http://localhost:7474 并登录
+```
+
+#### APOC插件问题
+```bash
+# 如果看到"apoc.refactor.mergeNodes not found"
+# 不用担心，系统会自动跳过实体合并功能
+# 如需安装: Neo4j Desktop -> Plugins -> APOC -> Install
+```
+
+#### API Key问题
+```bash
+# 检查设置
+echo $GOOGLE_API_KEY        # Linux/Mac
+echo $env:GOOGLE_API_KEY    # Windows
+
+# 如果显示空白，请重新设置并重启终端
 ```
 
 ## 📖 使用指南
