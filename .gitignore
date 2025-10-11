@@ -39,6 +39,13 @@ Thumbs.db
 docs/team/
 team_docs/
 internal_docs/
+TEAM_DEVELOPER_GUIDE.md
+CYPHER_ERROR_FIX.md
+GRAPH_QUERY_DEBUG_LOG.md
+COMMIT_MESSAGE.md
+HANDOVER_DOCUMENT.md
+REFACTORING_CHANGELOG.md
+SESSION_SUMMARY.md
 
 # Legacy版本
 legacy_versions/

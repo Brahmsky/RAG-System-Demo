@@ -118,8 +118,8 @@ git push origin main
 ---
 
 ## 💬 给下一个AI会话的话
-
-1. **首先阅读** `HANDOVER_DOCUMENT.md` 了解完整上下文
+请阅读HANDOVER_DOCUMENT.md，我们要继续实现多模态功能，从 ImageEmbedder 开始：
+1. **首先阅读** `HANDOVER_DOCUMENT.md` 了解完整上下文 请阅读 
 2. **关键文件** 都在根目录，以 `*.md` 结尾
 3. **架构已重构**，所有导入路径已更新
 4. **下一目标**: 实现 ImageEmbedder 类
