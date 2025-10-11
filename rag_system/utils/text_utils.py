@@ -71,5 +71,5 @@ class TextProcessor:
         # 可选：过滤掉过短的块（比如只有标点或空格）
         chunks = [chunk.strip() for chunk in chunks if len(chunk.strip()) > 20]
 
-        print(f"✂️  切分完成：{len(chunks)} 个块 | 语言：{language} | 目标块大小：{chunk_size}")
+        print(f"[文本切分] 完成：{len(chunks)} 个块 | 语言：{language} | 目标块大小：{chunk_size}")
         return chunks

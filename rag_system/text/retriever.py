@@ -1,4 +1,4 @@
-from .smart_tokenize import smart_tokenize
+from ..utils.smart_tokenize import smart_tokenize
 from typing import List
 from .query_expander import QueryExpander
 

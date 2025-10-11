@@ -4,16 +4,16 @@ from google import genai
 from openai import OpenAI
 from neo4j import GraphDatabase
 
-from .database import KnowledgeDatabase
-from .retriever import Retriever
-from .reranker import Reranker
-from .compressor import Compressor
-from .generator import Generator
-from .text_utils import TextProcessor
-from .config import RAGConfig
-from .multiquery_generator import MultiqueryGenerator
-from .embedder import Embedder
-from .neo.Data2Neo4j import Data2Neo4j
+from .core.database import KnowledgeDatabase
+from .text.retriever import Retriever
+from .text.reranker import Reranker
+from .generation.compressor import Compressor
+from .generation.generator import Generator
+from .utils.text_utils import TextProcessor
+from .core.config import RAGConfig
+from .text.multiquery_generator import MultiqueryGenerator
+from .core.embedder import Embedder
+from .graph.Data2Neo4j import Data2Neo4j
 
 class RAGSystem:
     def __init__(self, config: RAGConfig):
@@ -38,8 +38,10 @@ class RAGSystem:
 
         query_expander = MultiqueryGenerator(llm_client, config.llm_model_name)
 
-        collection_name = RAGConfig.embedding_model_name.replace('/', '_')
-        self.collection = self.db.chroma_client.get_or_create_collection(name=collection_name)
+        # 注意：这里应该使用 config.embedding_model_name（实例属性），而不是 RAGConfig.embedding_model_name（类属性）
+        # collection 已经在 self.db 初始化时创建了，这里是重复获取（可以删除）
+        # collection_name = config.embedding_model_name.replace('/', '_')
+        # self.collection = self.db.chroma_client.get_or_create_collection(name=collection_name)
 
         # 初始化模块
         self.retriever = Retriever(self.db, embedder=self.embedder, query_expander=query_expander, verbose=config.verbose)
@@ -58,7 +60,7 @@ class RAGSystem:
         chunks = TextProcessor.split_text(text, language=language)
 
         ids = [f"{filename}_{i}" for i in range(len(chunks))]
-        existing_ids = set(self.collection.get(ids=ids)['ids'])
+        existing_ids = set(self.db.collection.get(ids=ids)['ids'])
         print(f"在数据库中找到了{len(existing_ids)}个已存在的块")
 
         new_docs, new_ids = [], []

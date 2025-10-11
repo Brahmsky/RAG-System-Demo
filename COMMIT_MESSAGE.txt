@@ -1,0 +1,26 @@
+refactor: 架构重构为多模态扩展做准备 (v2.0)
+
+重大变更：
+- 模块化重构：按功能分层(core/text/graph/generation/utils)
+- 目录重组：neo/ → graph/，新增独立模块目录
+- 图谱优化：Cypher查询自动修复，成功率提升至90%
+- Bug修复：修复文本检索关键bug (collection引用错误)
+- 数据库增强：新增状态可视化功能
+- 日志优化：简化输出，保留核心信息
+- 多模态准备：创建测试语料和目录结构
+
+新增文档：
+- HANDOVER_DOCUMENT.md - 完整交接文档
+- REFACTORING_CHANGELOG.md - 重构变更清单  
+- CYPHER_ERROR_FIX.md - Cypher错误修复方案
+- GRAPH_QUERY_DEBUG_LOG.md - 图谱查询日志说明
+- Knowledgebase/multimodal_test.md - 多模态测试语料
+
+Breaking Changes:
+- 导入路径变更：所有模块需更新import路径
+- neo/ 目录已重命名为 graph/
+
+迁移指南见：TEAM_DEVELOPER_GUIDE.md
+
+Closes: 为多模态图像检索功能铺路
+
